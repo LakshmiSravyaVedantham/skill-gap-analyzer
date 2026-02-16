@@ -8,7 +8,15 @@ async function callAI(prompt) {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.7 }),
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: 'You are a world-class career advisor, skill gap analyst, and technical recruiter with 20 years of experience. You provide extremely detailed, actionable analysis. Always return valid JSON only.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 4096
+      }),
     });
     if (res.ok) { const data = await res.json(); return data.choices[0].message.content; }
     console.warn('Groq failed, falling back to Ollama...');
@@ -24,32 +32,126 @@ async function callAI(prompt) {
 
 function parseJSON(text) {
   try { return JSON.parse(text.trim()); }
-  catch { const m = text.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0]); throw new Error('Failed to parse AI response'); }
+  catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('Failed to parse AI response');
+  }
 }
 
 async function analyzeGap(jobPosting, userSkills) {
-  const text = await callAI(`You are a career development expert and skill gap analyst.
+  const text = await callAI(`You are a world-class career development expert, technical recruiter, and skill gap analyst.
 
-JOB POSTING:
+=== JOB POSTING ===
 ${jobPosting}
 
-CANDIDATE'S CURRENT SKILLS/RESUME:
+=== CANDIDATE CURRENT SKILLS / RESUME ===
 ${userSkills}
 
-Analyze the gap. Return ONLY valid JSON:
+Perform an exhaustive skill gap analysis. Return ONLY valid JSON (no markdown, no code fences) with this EXACT structure:
+
 {
   "jobTitle": "<extracted job title>",
-  "company": "<extracted company or 'Not specified'>",
-  "matchScore": <1-100>,
-  "matchedSkills": [{"skill":"<name>","level":"<strong|moderate|basic>","note":"<note>"}],
-  "missingSkills": [{"skill":"<name>","importance":"<critical|important|nice-to-have>","difficulty":"<easy|medium|hard>","timeToLearn":"<e.g. 2 weeks>"}],
-  "learningPath": [{"phase":1,"title":"<title>","duration":"<duration>","skills":["<skill>"],"resources":[{"name":"<name>","type":"<course|book|tutorial|project>","free":true}]}],
-  "quickWins": ["<action>"],
-  "resumeTips": ["<tip>"],
-  "verdict": "<Ready to Apply|Almost Ready|Need More Preparation|Significant Gap>"
+  "company": "<extracted company or Not specified>",
+  "matchScore": 75,
+  "verdict": "<Ready to Apply|Almost Ready|Need More Preparation|Significant Gap>",
+
+  "matchedSkills": [
+    {
+      "skill": "<skill name>",
+      "level": "<strong|moderate|basic>",
+      "currentProficiency": "<advanced|intermediate|beginner>",
+      "targetProficiency": "<advanced|intermediate|beginner>",
+      "note": "<how this skill relates to the job>"
+    }
+  ],
+
+  "missingSkills": [
+    {
+      "skill": "<skill name>",
+      "importance": "<critical|important|nice-to-have>",
+      "priorityScore": 8,
+      "difficulty": "<easy|medium|hard>",
+      "timeToLearn": "<e.g. 2 weeks>",
+      "currentProficiency": "none",
+      "targetProficiency": "<advanced|intermediate|beginner>",
+      "salaryImpact": "<estimated annual salary increase in USD if this skill is acquired, e.g. +5000-10000>",
+      "industryDemand": "<very high|high|moderate|low>",
+      "demandTrend": "<rising|stable|declining>",
+      "portfolioProject": "<a specific project idea to demonstrate this skill>"
+    }
+  ],
+
+  "salaryAnalysis": {
+    "estimatedRangeWithCurrentSkills": "<e.g. 80000-95000>",
+    "estimatedRangeWithAllSkills": "<e.g. 110000-130000>",
+    "potentialIncrease": "<e.g. +25000-35000>",
+    "topPayingSkills": ["<skill that adds most salary value>", "<next>", "<next>"]
+  },
+
+  "candidateComparison": {
+    "strengthsVsTypical": ["<what makes this candidate stand out>"],
+    "weaknessesVsTypical": ["<where this candidate falls behind typical applicants>"],
+    "competitiveEdge": "<brief summary of how candidate compares to top applicants for this role>"
+  },
+
+  "quickWins": [
+    {
+      "action": "<specific action to take>",
+      "timeRequired": "<e.g. 2 hours, 1 day>",
+      "impact": "<high|medium|low>"
+    }
+  ],
+
+  "learningRoadmap": [
+    {
+      "week": "<e.g. Week 1-2>",
+      "phase": 1,
+      "title": "<phase title>",
+      "focusSkills": ["<skill>"],
+      "dailyHours": 2,
+      "milestones": ["<what you should be able to do by end of this phase>"],
+      "resources": [
+        {
+          "name": "<specific course/tutorial/book name>",
+          "url": "<actual URL if possible, otherwise empty string>",
+          "type": "<course|tutorial|book|project|video|documentation>",
+          "platform": "<e.g. freeCodeCamp, Coursera, YouTube, MDN, etc.>",
+          "free": true,
+          "estimatedHours": 10
+        }
+      ]
+    }
+  ],
+
+  "portfolioProjects": [
+    {
+      "title": "<project name>",
+      "description": "<what to build>",
+      "skillsDemonstrated": ["<skill>"],
+      "difficulty": "<beginner|intermediate|advanced>",
+      "estimatedTime": "<e.g. 1 week>",
+      "techStack": ["<technology>"]
+    }
+  ],
+
+  "resumeTips": ["<actionable tip to improve resume for this specific role>"],
+
+  "interviewPrep": [
+    "<likely interview question or topic for this role>"
+  ]
 }
 
-Return ONLY JSON, no markdown.`);
+IMPORTANT INSTRUCTIONS:
+- Be extremely specific with resource recommendations - use real course names, real platforms
+- For salary figures, use realistic market data for this role
+- Priority scores should reflect how critical each skill is for getting hired
+- Quick wins should be things achievable in under a week
+- The learning roadmap should be week-by-week for 4-8 weeks
+- Portfolio projects should be impressive enough to discuss in interviews
+- Compare against what a strong candidate for this specific role looks like
+- Return ONLY the JSON object, no other text`);
+
   return parseJSON(text);
 }
 

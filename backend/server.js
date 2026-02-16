@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const analyzeRoutes = require('./routes/analyze');
 
 dotenv.config();
@@ -15,6 +16,12 @@ app.use('/api/analyze', analyzeRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'skill-gap-analyzer' });
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
